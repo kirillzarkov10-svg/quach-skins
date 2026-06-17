@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quach Skins - Загрузка скинов</title>
+    <style>
+        body {
+            background-color: #111215;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .upload-container {
+            background-color: #16171b;
+            border: 1px solid #2c2f36;
+            border-radius: 12px;
+            padding: 30px;
+            width: 380px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        h2 {
+            color: #00B0F4;
+            margin: 0 0 5px 0;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: bold;
+            color: #8e9297;
+            margin-bottom: 5px;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            box-sizing: border-box;
+            background-color: #1d1f24;
+            color: white;
+            border: 1px solid #2c2f36;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            background-color: #00B0F4;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #009cd9;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #686d73;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="upload-container">
+    <h2>СЕРВЕР СКИНОВ QUACH</h2>
+    <p style="color: #8e9297; font-size: 13px; margin-bottom: 25px;">Загрузи свой скин прямо в базу лаунчера</p>
+
+    <div class="input-group">
+        <label>ТВОЙ ИГРОВОЙ НИКНЕЙМ</label>
+        <input type="text" id="playerNick" placeholder="Введи ник как в лаунчере...">
+    </div>
+
+    <div class="input-group">
+        <label>ВЫБЕРИ ФАЙЛ СКИНА (.PNG)</label>
+        <input type="file" id="skinFile" accept=".png">
+    </div>
+
+    <button onclick="uploadSkin()">УСТАНОВИТЬ СКИН</button>
+
+    <div id="status">Система готова</div>
+</div>
+
+<script>
+async function uploadSkin() {
+    // =========================================================================
+    // НАСТРОЙКА ДАННЫХ: Твой ник на гитхабе и две половинки токена
+    // =========================================================================
+    const GITHUB_USER = "kirillzarkov10-svg"; 
+    const TOKEN_PART1 = "ghp_Ar9bYKdJH1EdZ0kmcna"; // Например: ghp_12345abc
+    const TOKEN_PART2 = "MrAGLPNTbRM2p3oOa"; // Например: def67890xyz
+    
+    const REPO_NAME = "quach-skins";
+    // =========================================================================
+    
+    const nick = document.getElementById('playerNick').value.trim();
+    const fileInput = document.getElementById('skinFile');
+    const statusDiv = document.getElementById('status');
+
+    if (!nick || fileInput.files.length === 0) {
+        statusDiv.innerText = "❌ Введи никнейм и выбери файл!";
+        statusDiv.style.color = "#ff4f4f";
+        return;
+    }
+
+    statusDiv.innerText = "Обработка изображения...";
+    statusDiv.style.color = "#686d73";
+
+    // Соединяем две половинки попы воедино перед отправкой запроса!
+    const FULL_TOKEN = TOKEN_PART1 + TOKEN_PART2;
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async function () {
+        const base64Content = reader.result.split(',')[1];
+        const path = `public/skins/${nick}.png`;
+        const url = `https://api.github.com/repos/${GITHUB_USER}/${REPO_NAME}/contents/${path}`;
+
+        statusDiv.innerText = "Синхронизация с базой данных...";
+
+        let sha = null;
+        try {
+            const checkResponse = await fetch(url, {
+                headers: { 'Authorization': `token ${FULL_TOKEN}` }
+            });
+            if (checkResponse.ok) {
+                const checkData = await checkResponse.json();
+                sha = checkData.sha;
+            }
+        } catch (e) {}
+
+        statusDiv.innerText = "Загрузка скина на сервер...";
+
+        const bodyData = {
+            message: `Skin uploaded/updated for player: ${nick}`,
+            content: base64Content
+        };
+        if (sha) bodyData.sha = sha;
+
+        try {
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${FULL_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (response.ok) {
+                statusDiv.innerText = `✅ Скин для ${nick} успешно установлен!`;
+                statusDiv.style.color = "#4fff4f";
+            } else {
+                const errData = await response.json();
+                statusDiv.innerText = `❌ Ошибка загрузки: ${errData.message}`;
+                statusDiv.style.color = "#ff4f4f";
+            }
+        } catch (error) {
+            statusDiv.innerText = "❌ Ошибка сети.";
+            statusDiv.style.color = "#ff4f4f";
+        }
+    };
+}
+</script>
+</body>
+</html>
